@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentinelx"
+version = "1.0.0"
+description = "SentinelX is a lightweight, real-time Security Information & Event Management (SIEM) daemon for Linux authentication logs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    {name = "SentinelX Contributors"}
+]
+keywords = ["security", "siem", "log monitoring", "authentication", "flask", "websocket"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Information Technology",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Logging",
+    "Topic :: System :: Monitoring",
+    "Topic :: Security"
+]
+dependencies = [
+    "eventlet==0.41.0",
+    "Flask==3.1.3",
+    "Flask-SocketIO==5.6.1",
+    "greenlet==3.5.3",
+    "PyYAML==6.0.2",
+    "Werkzeug==3.1.8",
+    "Jinja2==3.1.6",
+    "MarkupSafe==3.0.3",
+    "itsdangerous==2.2.0",
+    "blinker==1.9.0",
+    "python-socketio==5.16.3",
+    "python-engineio==4.13.3"
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pluggy==1.6.0",
+    "iniconfig==2.3.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["core/tests"]

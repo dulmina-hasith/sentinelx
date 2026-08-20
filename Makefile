@@ -6,20 +6,20 @@ help:
 	@echo "  make test       - Run all unit and integration tests"
 	@echo "  make mock-logs  - Run the mock log generator to simulate auth traffic"
 	@echo "  make lint       - Run syntax verification on code files"
-	@echo "  make clean      - Clean up temporary files, state, caches, and __pycache__"
+	@echo "  make clean      - Clean up temporary files, state, caches, and .pyc files"
 
 run:
-	./venv/bin/python run.py
+	./.venv/bin/python run.py
 
 test:
-	PYTHONPATH=. ./venv/bin/pytest
+	PYTHONPATH=. ./.venv/bin/pytest
 
 mock-logs:
-	./venv/bin/python generate_mock_logs.py
+	./.venv/bin/python generate_mock_logs.py
 
 lint:
-	./venv/bin/python -m py_compile run.py config.py core/*.py tests/*.py
-	@echo "Syntax verification passed."
+	./.venv/bin/python -m py_compile run.py config.py core/*.py tests/*.py
+	@echo "Syntax verification pass successful."
 
 clean:
 	rm -rf .pytest_cache

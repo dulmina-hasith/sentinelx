@@ -4,8 +4,8 @@
 set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_PYTHON="$DIR/venv/bin/python"
-VENV_PYTEST="$DIR/venv/bin/pytest"
+VENV_PYTHON="$DIR/.venv/bin/python"
+VENV_PYTEST="$DIR/.venv/bin/pytest"
 
 function print_help() {
     echo "SentinelX Management Helper Utilities"

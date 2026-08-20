@@ -1,36 +1,50 @@
 # Contributing to SentinelX
 
-We welcome contributions to SentinelX! Please follow these guidelines to ensure a smooth contribution process.
+Thanks for your interest in contributing. This guide covers the
+contribution workflow, coding standards, and the test layout used in
+this repository.
 
-## How to Contribute
+---
 
-1. **Fork the Repository**: Create a personal copy of the repository.
-2. **Create a Feature Branch**: Work on your changes in a descriptive branch.
+## 1. Development environment
+
+```bash
+git clone https://github.com/GGdulmina/sentinelx.git
+cd sentinelx
+
+uv venv
+uv sync
+source .venv/bin/activate
+```
+
+`manage.sh` already wraps `.venv/bin/python` and `.venv/bin/pytest`, so
+you do not need to keep the venv activated for the commands below.
+
+---
+
+## 2. Contribution workflow
+
+1. **Fork** the repository.
+2. **Create a feature branch** with a descriptive name:
    ```bash
    git checkout -b feature/my-new-feature
    ```
-3. **Write Code & Verify Syntax**: Ensure your changes adhere to standard coding practices.
+
+3. **Write code + tests** — see [§3 Coding standards](#3-coding-standards)
+   and [§4 Test layout](#4-test-layout) below.
+
+4. **Verify locally** before pushing:
    ```bash
-   ./manage.sh lint
+   ./manage.sh lint    # syntax check across run.py, config.py, core/*.py
+   ./manage.sh test    # full pytest suite — must be 16/16 green
    ```
-4. **Write Tests**: Add unit or integration tests in the `tests/` directory for any new logic or bug fixes.
-5. **Run the Test Suite**: Verify that all tests pass.
-   ```bash
-   ./manage.sh test
-   ```
-6. **Submit a Pull Request**: Submit your pull request with a clear description of the problem and your solution.
 
-## Coding Standards
+5. **Open a pull request** against `main`. Describe the problem, the
+   solution, and how you validated it. Reference any related issue.
 
-- Follow PEP 8 style guidelines.
-- Use explicit type hints in function signatures.
-- Avoid using greedy `.*` patterns in regular expressions to prevent ReDoS.
-- All extracted string fields from logs must be validated and sanitized using `core.parser.sanitize_input`.
-- Use the standard `logging` library instead of `print` statements in core modules.
+---
 
-## Testing Guidelines
+## 3. Coding standards
 
-- All tests must pass before submitting a pull request.
-- Test coverage should be maintained or increased.
-- Use `pytest` for all test cases.
-- Use parameterized tests where appropriate (e.g., testing multiple parser patterns).
+- **PEP 8.** Standard Python style. Four-space indent, snake_case,
+  type hints on public function signatures.

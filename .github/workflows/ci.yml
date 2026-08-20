@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up UV
+      uses: astral-sh/setup-uv@v3
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Run tests
+      run: |
+        source .venv/bin/activate
+        ./manage.sh test

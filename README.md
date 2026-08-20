@@ -1,81 +1,52 @@
 # SentinelX
 
 ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](file:///home/id43/Desktop/GD43/sentinelx/LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 ![Stage](https://img.shields.io/badge/status-production__ready-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-16%20passed-brightgreen.svg)
 
-SentinelX is a lightweight, real-time security information and event management (SIEM) daemon designed to monitor Linux authentication logs, detect suspicious login patterns, and alert on potential security threats like brute-force attacks in real time.
+SentinelX is a lightweight, real-time **Security Information & Event Management
+(SIEM)** daemon for Linux authentication logs. It tails `sshd` log streams,
+parses authentication events with anchored (ReDoS-safe) regular expressions,
+tracks per-IP failure counts, escalates alerts as failure thresholds are
+crossed, persists state atomically, and ships every alert to a live web
+dashboard over WebSocket.
 
-By streaming log data through a concurrent, multi-threaded pipeline, SentinelX provides immediate, structured visibility into host-level authentication activity.
-
----
-
-## Technical Documentation
-
-Detailed guides are available in the `docs/` directory:
-
-1. **[Installation Guide](docs/installation.md)**: System prerequisites, environment setup, privileges dropping, and configuring systemd.
-2. **[Configuration Guide](docs/configuration.md)**: Configuration schema explanation (`config.yaml`), defaults, and environment variables.
-3. **[Usage Guide](docs/usage.md)**: Executing the application, simulating traffic using the mock generator, and reading outputs.
-4. **[Troubleshooting Guide](troubleshooting.md)**: Permissions, log rotation recovery, state corruption, and watcher details.
-5. **[Architecture Guide](docs/architecture.md)**: Decoupled design overview, Mermaid sequence flow diagram, and components detail.
-
-Personal Journal `docs/archive_journal` directory:
-QA tests `docs/QA`:
+The runtime is built on Flask + Flask-SocketIO (eventlet) and is safe to run
+without root: the watcher reads whatever file path is given to it, including
+the bundled test fixture used in development.
 
 ---
 
 ## Quick Start
 
-### 1. Setup & Install Dependencies
+The fastest way to see SentinelX working is to point it at the bundled
+fixture file with the `SENTINELX_LOG_PATH` environment variable, then open the
+dashboard in a browser.
+
+### 1. Clone, install, and verify
+
 ```bash
-# Clone the repository
-git clone https://github.com/GGdulmina/sentinelx.git
+git clone https://github.com/dulmina-hasith/sentinelx.git
 cd sentinelx
 
-# Create virtual environment and install requirements
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+uv venv
+uv sync
+source .venv/bin/activate
+
+./manage.sh test      # 16/16 unit + integration + stress tests
+./manage.sh lint      # syntax check
 ```
 
-### 2. Run the Test Suite
-Ensure that all unit and integration tests pass:
+### 2. Run SentinelX against a log file
+
+The runtime looks for a log path in this order:
+
+1. `SENTINELX_LOG_PATH` environment variable (highest priority — **use this for the demo flow**)
+2. The first existing path listed in `log_paths` from `config.yaml`
+3. Built-in fallback: `core/tests/fixtures/auth_small.log`
+
 ```bash
-./manage.sh test
+export SENTINELX_LOG_PATH="core/tests/fixtures/auth_small.log"
+./manage.sh run
 ```
-
-### 3. Simulate Traffic
-To test the pipeline end-to-end without needing root privileges:
-
-- **Terminal 1**: Start SentinelX on the mock log file:
-  ```bash
-  ./manage.sh run mock_auth.log
-  ```
-
-- **Terminal 2**: Generate mock authentication events:
-  ```bash
-  ./manage.sh mock-logs
-  ```
-
----
-
-## Features
-
-- **Concurrent Multi-Tailing**: Tail multiple authentication log paths in parallel using thread-safe queues.
-- **Robust Watcher**: Detects log rotation (inode changes) and truncation automatically, ensuring no gaps in logging.
-- **ReDoS Prevention**: Anchored, strict regex patterns that prevent catastrophic backtracking vulnerabilities.
-- **Input Sanitization**: Automatically strips ANSI escape codes and controls non-printable bytes to prevent terminal injection.
-- **State Persistence**: Saves brute-force event counts atomically in a JSON file to withstand application crashes or restarts.
-- **Privilege Dropping**: If started as root, automatically drops privileges to an unprivileged user (`nobody`) after startup.
-- **Flexible Configuration**: Full YAML file and environment variable overrides.
-
----
-
-## Contributing
-
-Please read the **[Contributing Guidelines](CONTRIBUTING.md)** before submitting pull requests.
-
-## License
-
-This project is licensed under the MIT Licence - see the **[LICENSE](LICENSE)** file for details.

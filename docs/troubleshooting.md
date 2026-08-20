@@ -1,72 +1,269 @@
 # SentinelX Troubleshooting Guide
 
-This guide helps you identify and resolve common issues encountered while deploying or operating SentinelX.
+Common runtime problems and how to fix them.
 
 ---
 
-## 1. File Permissions / Access Issues
+## 1. The daemon starts but no alerts ever appear
 
-### Symptom: `[ERROR] Cannot read log file /var/log/auth.log: [Errno 13] Permission denied`
+### Symptom
 
-#### Why this happens:
-System logs are highly sensitive and are restricted to `root` or members of privileged administrative groups (like `adm` or `log`).
+```text
+Background daemon tracking target log vector: core/tests/fixtures/auth_small.log
+Opened and started watching core/tests/fixtures/auth_small.log from the end
+```
 
-#### Solutions:
-- **Run as root with automatic privilege dropping**: 
-  Start SentinelX as root. It will open the log files, then drop privileges to `nobody` or the configured unprivileged user.
+…and then silence, even though traffic is being written to the file.
+
+### Why this happens
+
+`core/watcher.py:follow()` seeks to the **end of the file on the very
+first open** of the process. Anything that was already in the log is
+skipped — only lines appended *after* SentinelX starts are processed.
+
+### Fixes
+
+- **Append, do not overwrite.** If you `truncate` the file and then write
+  to it, the watcher does see the new content (it detects truncation via
+  inode + size). The bundled `generate_mock_logs.py` does exactly this.
+- **Restart the daemon** after writing historical content if you need it
+  scanned; the daemon reads from the start on its second-and-later opens
+  of the same path.
+- **Run the mock generator against a different file** than the daemon is
+  watching. Verify the env var is set in *both* terminals:
+
   ```bash
-  sudo ./manage.sh run
+  echo $SENTINELX_LOG_PATH
   ```
-- **Ensure the unprivileged user has access**:
-  If you configure privilege dropping to user `sentinelx`, make sure this user is added to the `adm` group so that it has permission to reopen the log file after rotation:
+
+  must print the same path in both.
+
+---
+
+## 2. `Permission denied` on the log file
+
+### Symptom
+
+```text
+[ERROR] core.watcher: Permissions/Missing file error reading /var/log/auth.log:
+[Errno 13] Permission denied: '/var/log/auth.log'. Retrying in 5 seconds...
+```
+
+### Why this happens
+
+`/var/log/auth.log` (Debian/Ubuntu) and `/var/log/secure` (RHEL) are
+mode `0640`, owned by `root:adm`. The user running `run.py` is not in
+the `adm` group and did not start as `root`.
+
+### Fixes
+
+- **Start as root and let SentinelX drop privileges.** The runtime calls
+  `core/privileges.py:drop_privileges` after opening the file:
+
   ```bash
-  sudo usermod -aG adm sentinelx
+  sudo SENTINELX_LOG_PATH=/var/log/auth.log ./manage.sh run
   ```
-- **Run as an authorized user directly**:
-  Run SentinelX as a user who already has read permissions to the files (without using sudo).
+
+  The default target is `nobody` / `nogroup`; override with
+  `SENTINELX_RUN_AS_USER` / `SENTINELX_RUN_AS_GROUP`. The unprivileged
+  user **must still be able to read the rotated log** — add it to
+  `adm` if you rotate via `logrotate` and the file mode resets.
+
+- **Run as a member of `adm`.** Or grant ACL access to the log file:
+
+  ```bash
+  sudo setfacl -m u:sentinelx:r /var/log/auth.log
+  ```
+
+- **Use the demo flow** while debugging. The bundled fixture
+  `core/tests/fixtures/auth_small.log` is readable by everyone:
+
+  ```bash
+  export SENTINELX_LOG_PATH="core/tests/fixtures/auth_small.log"
+  ./manage.sh run
+  ```
 
 ---
 
-## 2. Log Rotation Issues
+## 3. The dashboard does not load at `http://127.0.0.1:5000`
 
-### Symptom: SentinelX stops showing new login alerts after midnight or log rotation.
+### Symptom
 
-#### Why this happens:
-In older versions, SentinelX tracked log files via their open file descriptor (`f.fileno()`). When the file was rotated by `logrotate`, the inode of the path changed, but the file descriptor kept pointing to the old rotated log file (e.g., `auth.log.1`), failing to monitor new entries.
+Browser shows “connection refused” or a long wait, and `curl` to the
+endpoint hangs or refuses.
 
-#### Solutions:
-- **Upgrade**: Ensure you are running the latest version of `core/watcher.py` which stats the *file path* (`os.stat(log_path).st_ino`) and compares it with the descriptor's inode to detect rotations and reopen the files automatically.
-- **Permission Check**: Make sure the unprivileged user that SentinelX dropped privileges to has read access to the directory containing the logs, so it can read the newly created log file.
+### Why this happens
+
+- A different process is bound to port 5000. The dev server uses
+  `socketio.run(app, host="127.0.0.1", port=5000, ...)`.
+- SentinelX is still starting up (eventlet takes ~1 s to initialise).
+- The daemon is running on a different host than your browser (it binds
+  to the **loopback** interface only).
+
+### Fixes
+
+- Check what is listening: `ss -tlnp | grep 5000`
+- Wait a second and retry. Logs will show
+  `Running on http://127.0.0.1:5000` once the server is ready.
+- For remote access, front the daemon with a reverse proxy (nginx /
+  Caddy) — SentinelX itself does not bind a public interface.
 
 ---
 
-## 3. State Persistence Issues
+## 4. State file errors after a crash
 
-### Symptom: Failure counts reset to 0 after SentinelX restarts, or errors like `[ERROR] Error loading state...` are logged.
+### Symptom
 
-#### Why this happens:
-- State file path (`sentinelx_state.json`) is not configured or disabled (`state_file: null`).
-- The unprivileged user running SentinelX does not have write access to the directory to save/update the state file.
-- The state file was corrupted.
+```text
+[ERROR] core.alerts: Error loading system state index: <some JSON decode error>
+```
 
-#### Solutions:
-- **Enable State Persistence**: Verify that `state_file` is defined in `config.yaml` and is set to a valid writable path.
-- **Fix Directory Ownership**: Ensure the SentinelX process user has write permissions to the working directory:
+…or simply: failure counts reset to 0 after a restart.
+
+### Why this happens
+
+- The state file path in `state_file` is not writable by the dropped
+  privilege user.
+- The file was corrupted by a kill -9 that interrupted a write (the
+  engine uses atomic `os.replace`, so this should be rare, but a
+  pre-existing bad file is still a bad file).
+- `state_file` was set to `null` in `config.yaml`, in which case
+  counters are in-memory only and **always** reset on restart.
+
+### Fixes
+
+- Make the directory writable by the runtime user:
+
   ```bash
   sudo chown -R sentinelx:sentinelx /opt/sentinelx
   ```
-- **Corrupted State Recovery**: If the state file contains invalid JSON, delete it. SentinelX will automatically initialize a new state file on the next failure event:
+
+- Delete a corrupted file. SentinelX will recreate it on the next
+  event:
+
   ```bash
   rm sentinelx_state.json
   ```
-  *(Note: SentinelX uses atomic file replacements via temporary files (`os.replace`) to prevent file corruption during sudden system shutdowns).*
+
+  (The atomic write uses a `*.tmp` then `os.replace`, so the file is
+  never observed half-written by the next start.)
+
+- Confirm `state_file` is not `null` if you want counters to survive
+  restarts.
 
 ---
 
-## 4. Watcher/Tailing Stalled
+## 5. `validate_config` raises on startup
 
-### Symptom: Log generator writes log entries but SentinelX prints nothing.
+### Symptom
 
-#### Solutions:
-- Check if you started SentinelX and the log generator on different file paths. Ensure both point to the exact same file (e.g., `./manage.sh run mock_auth.log` and `./manage.sh mock-logs`).
-- Remember that SentinelX seeks to the end of the file on its *very first* run to skip old logs. It will only print alerts for logs appended *after* SentinelX starts.
+```text
+ValueError: thresholds must satisfy: info <= warning <= critical
+```
+
+(or any other validation error from `config.py`).
+
+### Why this happens
+
+`config.py:validate_config` is called after merging defaults, YAML, and
+env vars, and refuses to start with bad input. Typical cases:
+
+- `thresholds` reordered, or one level is 0/negative
+- `log_paths` is not a list
+- `reset_after` or `alert_cooldown` is negative
+- A `SENTINELX_THRESHOLDS_*` env var contains a non-integer
+
+### Fixes
+
+- Print the merged config to inspect the effective values:
+
+  ```bash
+  PYTHONPATH=. venv/bin/python -c "from config import load_config; import json; print(json.dumps(load_config(), indent=2))"
+  ```
+
+- Reorder `thresholds` so `info <= warning <= critical`.
+- Unset conflicting `SENTINELX_*` env vars (`env | grep SENTINELX_`).
+
+---
+
+## 6. Mock generator writes to a different file than the daemon watches
+
+### Symptom
+
+`./manage.sh mock-logs` prints dispatched lines, but the daemon logs
+nothing and the API stats show `lines_parsed: 0` staying flat.
+
+### Why this happens
+
+`SENTINELX_LOG_PATH` is set in one terminal but not the other (or set
+to different values), so the generator and the watcher are pointed at
+different files.
+
+### Fixes
+
+- Verify both terminals resolve the same value:
+
+  ```bash
+  echo $SENTINELX_LOG_PATH    # in BOTH terminals
+  ```
+
+- Re-export in the second terminal if needed:
+
+  ```bash
+  export SENTINELX_LOG_PATH="core/tests/fixtures/auth_small.log"
+  ./manage.sh mock-logs
+  ```
+
+- The `mock-logs` command accepts a positional path argument that
+  overrides the env var for that run; make sure you are not passing a
+  different path.
+
+---
+
+## 7. `eventlet` deprecation warning
+
+### Symptom
+
+```text
+EventletDeprecationWarning: Eventlet is deprecated. It is currently being
+maintained in bugfix mode, and we strongly recommend against using it for
+new projects.
+```
+
+### Why this happens
+
+`run.py` calls `eventlet.monkey_patch()` before any other import, and
+Flask-SocketIO uses eventlet as its async driver. The warning is
+informational and does not affect functionality.
+
+### Fixes
+
+- This is expected for the current dependency set; it can be safely
+  ignored at runtime.
+- The dashboard and WebSocket events work as designed. If you need a
+  no-eventlet path, plan a migration to the threading or asyncio
+  SocketIO async modes (tracked separately; no current code change
+  needed for development).
+
+---
+
+## 8. Test suite failures
+
+### Symptom
+
+```bash
+./manage.sh test
+# ... FAILED
+```
+
+### Fixes
+
+- Ensure the venv is intact: `pip install -r requirements.txt`.
+- Some integration tests spawn a child Python process to validate
+  shutdown. If `run.py` is missing, the test is expected to fail —
+  re-clone if you have accidentally deleted the file.
+- Run a single failing test with verbose output:
+
+  ```bash
+  ./manage.sh test -k test_ut_watcher_001 -v
+  ```

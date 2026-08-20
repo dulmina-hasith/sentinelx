@@ -4,6 +4,8 @@ Handles configuration ingestion, dynamic OS log detection, secure root privilege
 dropping, and real-time WebSocket event dispatching.
 """
 
+import sys
+
 # CRITICAL FIX: Eventlet requires patching BEFORE any other imports occur
 try:
     import eventlet
@@ -11,37 +13,56 @@ try:
 except ImportError:
     pass
 
-import os
-import sys
-import threading
-import time
-import logging
-from flask import Flask, jsonify, render_template
-from flask_socketio import SocketIO
-
-# Force absolute path registration to survive sudo environment changes
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
-
-# Check if privileges.py is in root or inside core/
+# Now wrap everything else in a try-except to handle KeyboardInterrupt during imports
 try:
-    from privileges import drop_privileges
-except ModuleNotFoundError:
-    from core.privileges import drop_privileges
+    import os
+    import threading
+    import time
+    import logging
+    from flask import Flask, jsonify, render_template
+    from flask_socketio import SocketIO
 
-from config import load_config
-from core.watcher import follow
-from core.parser import parse_line
-from core.alerts import AlertEngine
+    # Force absolute path registration to survive sudo environment changes
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    if BASE_DIR not in sys.path:
+        sys.path.insert(0, BASE_DIR)
 
-# Setup structured console logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-logger = logging.getLogger("sentinelx.runtime")
+    # Check if privileges.py is in root or inside core/
+    try:
+        from privileges import drop_privileges
+    except ModuleNotFoundError:
+        from core.privileges import drop_privileges
+
+    from config import load_config
+    from core.watcher import follow
+    from core.parser import parse_line
+    from core.alerts import AlertEngine
+
+    # Setup structured console logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)]
+    )
+    logger = logging.getLogger("sentinelx.runtime")
+
+    import signal
+    # Register signal handlers - simple immediate exit for clean termination
+    def signal_handler(signum, frame):
+        logger.info("Termination signal captured. Exiting cleanly...")
+        logging.shutdown()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+except KeyboardInterrupt:
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("sentinelx.runtime")
+    logger.info("Termination signal captured during initialization. Exiting cleanly...")
+    logging.shutdown()
+    os._exit(0)
 
 # 1. Ingest layered configuration parameters
 cfg = load_config()
@@ -57,7 +78,7 @@ def resolve_active_log_path(configured_paths: list) -> str:
         if os.path.exists(path):
             logger.info(f"OS Detection Success: Found active security log file at {path}")
             return path
-            
+
     fallback_path = "core/tests/fixtures/auth_small.log"
     logger.warning(f"No production system logs found. Falling back to dev sandbox: {fallback_path}")
     return fallback_path
@@ -83,19 +104,19 @@ shutdown_event = threading.Event()
 def background_daemon_worker(log_path: str, state_path: str) -> None:
     """Run real-time authentication monitoring inside an isolated background thread."""
     logger.info(f"Background daemon tracking target log vector: {log_path}")
-    
+
     engine = AlertEngine(state_path=state_path)
-    
+
     try:
         for raw_line in follow(log_path):
             if shutdown_event.is_set():
                 break
-                
+
             SYSTEM_STATS["lines_parsed"] += 1
             parsed_data = parse_line(raw_line)
             if not parsed_data:
                 continue
-                
+
             alert_payload = engine.process_event(parsed_data)
             if alert_payload:
                 SYSTEM_STATS["alerts_dispatched"] += 1
@@ -107,7 +128,7 @@ def background_daemon_worker(log_path: str, state_path: str) -> None:
 
                 logger.warning(f"SECURITY ESCALATION: [{alert_payload['severity']}] {alert_payload['message']}")
                 socketio.emit('security_alert', alert_payload)
-                
+
     except Exception as e:
         logger.error(f"Uncaught exception inside background execution track: {e}")
 
@@ -150,7 +171,7 @@ def get_telemetry_metrics():
 
 if __name__ == "__main__":
     logger.info("Initializing SentinelX Operational System Fabric...")
-    
+
     # Spawn background monitoring thread using socketio background management
     socketio.start_background_task(
         target=background_daemon_worker,
@@ -159,10 +180,10 @@ if __name__ == "__main__":
     )
 
     time.sleep(0.5)
-    
+
     # Securely Drop Privileges right after starting the background file link
     drop_privileges(username=cfg['run_as_user'], group=cfg['run_as_group'])
-    
+
     try:
         socketio.run(app, host="127.0.0.1", port=5000, debug=False, use_reloader=False)
     except KeyboardInterrupt:
@@ -170,4 +191,5 @@ if __name__ == "__main__":
     finally:
         shutdown_event.set()
         logger.info("SentinelX Daemon stopped cleanly.")
+        logging.shutdown()
         sys.exit(0)
