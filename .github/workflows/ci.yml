@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, testing, develop]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, testing, develop]
 
 jobs:
   test:
@@ -15,11 +15,12 @@ jobs:
 
     - name: Set up UV
       uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: uv.lock
 
     - name: Install dependencies
-      run: uv sync
+      run: uv sync --locked
 
     - name: Run tests
-      run: |
-        source .venv/bin/activate
-        ./manage.sh test
+      run: uv run pytest

@@ -16,6 +16,23 @@ The runtime is built on Flask + Flask-SocketIO (eventlet) and is safe to run
 without root: the watcher reads whatever file path is given to it, including
 the bundled test fixture used in development.
 
+## Branch model
+
+SentinelX uses a three-branch workflow:
+
+- `main`: Staging branch. Receives merges from `testing` only after validation.
+- `testing`: Validation branch. Receives merges from `develop` for integration/regression/stress testing.
+- `develop`: Integration branch for new work. Contributors open PRs here.
+
+### Promotion flow
+
+```text
+feature work -> PR into develop -> PR develop into testing -> PR testing into main
+```
+
+Contributors should target the `develop` branch for their pull requests.
+
+
 ---
 
 ## Quick Start
@@ -32,10 +49,9 @@ cd sentinelx
 
 uv venv
 uv sync
-source .venv/bin/activate
 
-./manage.sh test      # 16/16 unit + integration + stress tests
-./manage.sh lint      # syntax check
+uv run ./manage.sh test      # 16/16 unit + integration + stress tests
+uv run ./manage.sh lint      # syntax check
 ```
 
 ### 2. Run SentinelX against a log file
@@ -48,5 +64,5 @@ The runtime looks for a log path in this order:
 
 ```bash
 export SENTINELX_LOG_PATH="core/tests/fixtures/auth_small.log"
-./manage.sh run
+uv run ./manage.sh run
 ```

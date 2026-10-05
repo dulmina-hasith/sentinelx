@@ -3,27 +3,29 @@ venv/
 
 # Python cache
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Environment files
-.env
-
-# IDE files
-.vscode/
-.idea/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Test artifacts
-.pytest_cache/
-
-# Logs
-*.log
-
-#Runtime file
-*sentinelx_state.json
+*.py[cod]
 *.egg-info/
+build/
+dist/
+
+# Environments (uv)
+.venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local runtime and config
+config.yaml
+sentinelx_state.json
+# Ignore all logs except those in core/tests/fixtures/
+*.log
+!core/tests/fixtures/*.log
+
+# Editors/OS
+.idea/
+.vscode/
+.DS_Store
