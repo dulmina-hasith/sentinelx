@@ -42,7 +42,6 @@ demo.
 ```bash
 uv venv
 uv sync
-source .venv/bin/activate
 ```
 
 Verify the install:
@@ -129,7 +128,7 @@ Type=simple
 User=root
 WorkingDirectory=/opt/sentinelx
 Environment=SENTINELX_LOG_PATH=/var/log/auth.log
-ExecStart=/opt/sentinelx/.venv/bin/python /opt/sentinelx/run.py
+ExecStart=uv run python run.py
 Restart=always
 RestartSec=5
 
@@ -158,7 +157,6 @@ the dashboard currently exposes no auth.
 cd /opt/sentinelx
 git pull
 uv sync
-source .venv/bin/activate
 ./manage.sh test
 sudo systemctl restart sentinelx.service
 ```

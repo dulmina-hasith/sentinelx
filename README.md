@@ -32,10 +32,9 @@ cd sentinelx
 
 uv venv
 uv sync
-source .venv/bin/activate
 
-./manage.sh test      # 16/16 unit + integration + stress tests
-./manage.sh lint      # syntax check
+uv run ./manage.sh test      # 16/16 unit + integration + stress tests
+uv run ./manage.sh lint      # syntax check
 ```
 
 ### 2. Run SentinelX against a log file
@@ -48,5 +47,5 @@ The runtime looks for a log path in this order:
 
 ```bash
 export SENTINELX_LOG_PATH="core/tests/fixtures/auth_small.log"
-./manage.sh run
+uv run ./manage.sh run
 ```
