@@ -267,3 +267,12 @@ informational and does not affect functionality.
   ```bash
   ./manage.sh test -k test_ut_watcher_001 -v
   ```
+
+---
+
+### Related documentation
+
+- [Installation guide](installation.md) - For setup and initial configuration
+- [Usage guide](usage.md) - For standard operation and examples
+- [Configuration reference](configuration.md) - For detailed configuration options
+- [Contributing guidelines](../CONTRIBUTING.md) - For information on contributing to SentinelX

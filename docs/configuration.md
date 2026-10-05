@@ -9,7 +9,7 @@ layers override earlier ones):
 
 `SENTINELX_LOG_PATH` is a special case — it is not part of the layered
 config and is read directly by `run.py:resolve_active_log_path`. See
-[§3](#3-sentinelx_log_path-the-demo-flow-shortcut) below.
+[§3](#3-sentinelx-log-path-the-demo-flow-shortcut) below.
 
 The full default configuration is also exported as
 [`config.yaml.example`](../config.yaml.example) so you can copy it and edit

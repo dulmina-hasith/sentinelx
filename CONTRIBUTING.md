@@ -98,3 +98,13 @@ uv run ./manage.sh test
 - **Never commit directly to `main` or `testing`**.
 - **Keep dependencies in `pyproject.toml` and `uv.lock`**.
 
+---
+
+### Related documentation
+
+- [Installation guide](docs/installation.md) - For setting up the development environment
+- [Usage guide](docs/usage.md) - For understanding how SentinelX works
+- [Configuration reference](docs/configuration.md) - For detailed configuration options
+- [Architecture overview](docs/architecture.md) - For understanding the system design
+- [Troubleshooting guide](docs/troubleshooting.md) - For common issues and solutions
+

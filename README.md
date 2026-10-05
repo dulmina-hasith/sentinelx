@@ -41,6 +41,17 @@ The fastest way to see SentinelX working is to point it at the bundled
 fixture file with the `SENTINELX_LOG_PATH` environment variable, then open the
 dashboard in a browser.
 
+## Documentation
+
+For detailed information, see the following guides:
+
+- [Installation](docs/installation.md) - Quick start and setup instructions
+- [Usage](docs/usage.md) - How to run and configure SentinelX
+- [Configuration](docs/configuration.md) - Complete configuration reference
+- [Architecture](docs/architecture.md) - System design and components
+- [Troubleshooting](docs/troubleshooting.md) - Common issues and solutions
+- [Contributing](CONTRIBUTING.md) - Guidelines for contributors
+
 ### 1. Clone, install, and verify
 
 ```bash
