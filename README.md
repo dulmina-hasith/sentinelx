@@ -16,6 +16,23 @@ The runtime is built on Flask + Flask-SocketIO (eventlet) and is safe to run
 without root: the watcher reads whatever file path is given to it, including
 the bundled test fixture used in development.
 
+## Branch model
+
+SentinelX uses a three-branch workflow:
+
+- `main`: Staging branch. Receives merges from `testing` only after validation.
+- `testing`: Validation branch. Receives merges from `develop` for integration/regression/stress testing.
+- `develop`: Integration branch for new work. Contributors open PRs here.
+
+### Promotion flow
+
+```text
+feature work -> PR into develop -> PR develop into testing -> PR testing into main
+```
+
+Contributors should target the `develop` branch for their pull requests.
+
+
 ---
 
 ## Quick Start
